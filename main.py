@@ -1,13 +1,45 @@
+import datetime
 import os
 import re
 
+from modules.json_manager import get_timestamp_from_json
 
-INPUT_FOLDER = "Photos\\180SampleFiles"
+INPUT_FOLDER = "Photos\\Input"
 OUTPUT_FOLDER = "Photos\\Output"
 
 
-def add_metadata(file_path, json_file):
-    print("Adding metadata to", file_path, "from", json_file)
+def process(file_path, json_file):
+    timestamp = get_timestamp_from_json(json_file)
+
+    if not os.path.exists(OUTPUT_FOLDER):
+        os.makedirs(OUTPUT_FOLDER)
+
+    # Get the file name and extension from the file path.
+    file_extension = os.path.splitext(file_path)[-1].lower()
+
+    offset = 0
+
+    while offset < 10:
+
+        if offset != 0:
+            print("tyring offset", offset)
+
+        new_timestamp = timestamp + offset
+
+        new_base_name = datetime.datetime.fromtimestamp(new_timestamp).strftime(
+            "%Y%m%d_%H%M%S"
+        )
+        new_file_name = new_base_name + file_extension
+        new_file_path = os.path.join(OUTPUT_FOLDER, new_file_name)
+
+        if not os.path.exists(new_file_path):
+            os.utime(file_path, (new_timestamp, new_timestamp))
+            os.rename(file_path, new_file_path)
+            os.remove(json_file)
+
+            break
+
+        offset += 1
 
 
 # Look for a corresponding json file.
@@ -55,11 +87,13 @@ def perfect_match_json(file_path):
     json_file = calculate_json_file_name(file_path)
 
     if os.path.exists(json_file):
-        add_metadata(file_path, json_file)
-        
+
+        print(file_path)
+
+        process(file_path, json_file)
+
     else:
-        # print("No JSON file for", file_path, ":", json_file)
-        return 
+        print("JSON file not found: ", json_file)
 
 
 # Iterate through all non json files in the folder.
@@ -75,16 +109,11 @@ def iterate(folder_path, function):
 def main():
 
     iterate(INPUT_FOLDER, remove_live_photos)
+
     iterate(INPUT_FOLDER, perfect_match_json)
 
 
 # Execute the main function
 if __name__ == "__main__":
-    exit_code = 0
-    try:
-        main()
-    except Exception as e:
-        print(e)
-        exit_code = 1
 
-    exit(exit_code)
+    main()
