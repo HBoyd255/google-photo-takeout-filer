@@ -66,6 +66,44 @@ def calculate_json_file_name(file_path):
 files_to_rename = {}
 
 
+def find_files_to_rename_supplemental_metadata(file_path):
+
+    print(file_path)
+
+    base_name, extension = os.path.splitext(file_path)
+
+    # Only process json files.
+    if extension != ".json":
+        return
+
+    target_key = ".supplemental-metadata"
+
+    #
+    for x in range(0, 3):
+
+        print("x", x)
+
+        part_target_key = target_key[:-x]
+
+        if x == 0:
+            part_target_key = target_key
+
+        part_target_key_json = part_target_key + ".json"
+
+        last_part_of_file_path = file_path[-len(part_target_key_json) :]
+
+        if last_part_of_file_path == part_target_key_json:
+
+            new_base_name = base_name[: -len(part_target_key)]
+            new_file_path = new_base_name + extension
+
+            print("Renaming", file_path, "to", new_file_path)
+
+            files_to_rename[file_path] = new_file_path
+
+            return
+
+
 def compare_files(file_a, file_b):
     # print("Comparing", file_a, "to", file_b)
 
@@ -195,6 +233,11 @@ def main():
     # Remove all files that do not have an extension.
     iterate(INPUT_FOLDER, separate_extensionless_files)
 
+    print('Removing ".supplemental-metadata"')
+    # Find all files that would match a neighboring file if they had one less
+    # character in the base name.
+    iterate(INPUT_FOLDER, find_files_to_rename_supplemental_metadata)
+
     print("Finding any files with an extra character")
     # Find all files that would match a neighboring file if they had one less
     # character in the base name.
@@ -206,6 +249,7 @@ def main():
         print("Renaming", old_file, "->", new_file)
         os.rename(old_file, new_file)
 
+
     iterate(INPUT_FOLDER, remove_live_photos)
 
     iterate(INPUT_FOLDER, perfect_match_json)
@@ -215,3 +259,4 @@ def main():
 if __name__ == "__main__":
 
     main()
+    pass
