@@ -6,13 +6,11 @@ from modules.json_manager import get_timestamp_from_json
 
 INPUT_FOLDER = "Photos\\Input"
 OUTPUT_FOLDER = "Photos\\Output"
+REJECT_FOLDER = "Photos\\Rejects"
 
 
 def process(file_path, json_file):
     timestamp = get_timestamp_from_json(json_file)
-
-    if not os.path.exists(OUTPUT_FOLDER):
-        os.makedirs(OUTPUT_FOLDER)
 
     # Get the file name and extension from the file path.
     file_extension = os.path.splitext(file_path)[-1].lower()
@@ -41,6 +39,9 @@ def process(file_path, json_file):
 
         offset += 1
 
+    if offset != 0:
+        print("Capped out at", file_path)
+
 
 # Look for a corresponding json file.
 def calculate_json_file_name(file_path):
@@ -54,6 +55,20 @@ def calculate_json_file_name(file_path):
         json_file = with_no_dupe + dupe_indicator + ".json"
 
     return json_file
+
+
+def separate_extensionless_files(file_path):
+
+    # Get the file name and extension from the file path.
+    file_base, file_extension = os.path.splitext(file_path)
+
+    file_name = file_base.split("\\")[-1]
+
+    if file_extension == "":
+
+        new_base = "NO_EXT-" + file_name
+        new_path = os.path.join(REJECT_FOLDER, new_base)
+        os.rename(file_path, new_path)
 
 
 def remove_live_photos(file_path):
@@ -96,6 +111,30 @@ def perfect_match_json(file_path):
         print("JSON file not found: ", json_file)
 
 
+def fuzzy_match_json(file_path):
+
+    # Get the file name and extension from the file path.
+    file_base, file_extension = os.path.splitext(file_path)
+
+    # Convert the file extension to lower case.
+    file_extension = file_extension.lower()
+
+    # Skip JSON files
+    if file_extension == ".json":
+        return
+    # IMG_0410.MP4
+    json_file = calculate_json_file_name(file_path)
+
+    if os.path.exists(json_file):
+
+        print(file_path)
+
+        process(file_path, json_file)
+
+    else:
+        print("JSON file not found: ", json_file)
+
+
 # Iterate through all non json files in the folder.
 def iterate(folder_path, function):
     # Iterate through all files in the folder
@@ -108,9 +147,17 @@ def iterate(folder_path, function):
 # Main function
 def main():
 
-    iterate(INPUT_FOLDER, remove_live_photos)
+    if not os.path.exists(OUTPUT_FOLDER):
+        os.makedirs(OUTPUT_FOLDER)
 
-    iterate(INPUT_FOLDER, perfect_match_json)
+    if not os.path.exists(REJECT_FOLDER):
+        os.makedirs(REJECT_FOLDER)
+
+    # iterate(INPUT_FOLDER, separate_extensionless_files)
+
+    # iterate(INPUT_FOLDER, remove_live_photos)
+
+    # iterate(INPUT_FOLDER, perfect_match_json)
 
 
 # Execute the main function
