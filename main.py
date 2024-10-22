@@ -68,8 +68,6 @@ files_to_rename = {}
 
 def find_files_to_rename_supplemental_metadata(file_path):
 
-    print(file_path)
-
     base_name, extension = os.path.splitext(file_path)
 
     # Only process json files.
