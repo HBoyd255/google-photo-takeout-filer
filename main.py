@@ -95,8 +95,6 @@ def find_files_to_rename_supplemental_metadata(file_path):
             new_base_name = base_name[: -len(part_target_key)]
             new_file_path = new_base_name + extension
 
-            print("Renaming", file_path, "to", new_file_path)
-
             files_to_rename[file_path] = new_file_path
 
             return
