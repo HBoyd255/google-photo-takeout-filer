@@ -5,7 +5,8 @@ import shutil
 TARGET_DIR = "Photos\\Input"
 OUTPUT_DIR = "Photos\\Output"
 REJECT_FOLDER = "Photos\\Rejects"
-TEMPLATE_DIR = "Photos\\SpecialCases"
+# TEMPLATE_DIR = "Photos\\SpecialCasesC"
+TEMPLATE_DIR = "Photos\\GooglePhotosFrom2023"
 
 # Delete all files in input directory.
 for filename in os.listdir(TARGET_DIR):
