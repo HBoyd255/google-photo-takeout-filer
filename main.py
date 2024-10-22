@@ -79,9 +79,7 @@ def find_files_to_rename_supplemental_metadata(file_path):
     target_key = ".supplemental-metadata"
 
     #
-    for x in range(0, 3):
-
-        print("x", x)
+    for x in range(len(target_key)):
 
         part_target_key = target_key[:-x]
 
