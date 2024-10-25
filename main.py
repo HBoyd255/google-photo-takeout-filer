@@ -4,8 +4,8 @@ import re
 
 from modules.json_manager import get_timestamp_from_json
 
-INPUT_FOLDER = "Photos\\Input"
-OUTPUT_FOLDER = "Photos\\Output"
+INPUT_FOLDER = "Photos\\Input2"
+OUTPUT_FOLDER = "Photos\\Output2"
 REJECT_FOLDER = "Photos\\Rejects"
 
 
@@ -51,6 +51,7 @@ def calculate_json_file_name(file_path):
 
     json_file_with_ext = base_name + extension + ".json"
     json_file_without_ext = base_name + ".json"
+    dupe_not_moved = json_file_with_ext
 
     pattern = r"\(\d+\)"  # Matches a digit or more between brackets
     match = re.search(pattern, file_path)
@@ -59,11 +60,7 @@ def calculate_json_file_name(file_path):
         with_no_dupe = re.sub(pattern, "", file_path)
         json_file_with_ext = with_no_dupe + dupe_indicator + ".json"
 
-    return json_file_with_ext, json_file_without_ext
-
-
-# The key is the file name, the value is the new file name.
-files_to_rename = {}
+    return json_file_with_ext, json_file_without_ext, dupe_not_moved
 
 
 def find_files_to_rename_supplemental_metadata(file_path):
@@ -74,9 +71,11 @@ def find_files_to_rename_supplemental_metadata(file_path):
     if extension != ".json":
         return
 
-    target_key = ".supplemental-metadata"
+    target_key = "supplemental-metadata"
 
-    #
+    replacement_pattern_dupe = r"(\1).json"
+    replacement_pattern_no_dupe = r".json"
+
     for x in range(len(target_key)):
 
         part_target_key = target_key[:-x]
@@ -84,14 +83,26 @@ def find_files_to_rename_supplemental_metadata(file_path):
         if x == 0:
             part_target_key = target_key
 
-        part_target_key_json = part_target_key + ".json"
+        pattern_dupe = rf"\.{part_target_key}\((\d+)\)\.json"
+        pattern_no_dupe = rf"\.{part_target_key}.json"
 
-        last_part_of_file_path = file_path[-len(part_target_key_json) :]
+        match_dupe = re.search(pattern_dupe, file_path)
+        match_no_dupe = re.search(pattern_no_dupe, file_path)
 
-        if last_part_of_file_path == part_target_key_json:
+        if match_dupe:
 
-            new_base_name = base_name[: -len(part_target_key)]
-            new_file_path = new_base_name + extension
+            new_file_path = re.sub(
+                pattern_dupe, replacement_pattern_dupe, file_path
+            )
+
+            files_to_rename[file_path] = new_file_path
+
+            return
+
+        if match_no_dupe:
+            new_file_path = re.sub(
+                pattern_no_dupe, replacement_pattern_no_dupe, file_path
+            )
 
             files_to_rename[file_path] = new_file_path
 
@@ -155,7 +166,9 @@ def remove_live_photos(file_path):
 
     # If the file is a mp4 file, and has a corresponding heic file, then it is
     # a "live photo" and should be removed.
-    if file_extension != ".mp4":
+
+    # This function is only for .mp4 and .MP files.
+    if file_extension != ".mp4" and file_extension != ".mp":
         return
 
     if os.path.exists(file_base + ".HEIC") or os.path.exists(
@@ -175,6 +188,35 @@ def remove_live_photos(file_path):
                     os.remove(file_path)
                 print("Removing", file_path)
 
+    # At one point Google Pixel decided to attempt to replicate Live Photos.
+    # The formatting for the video element is filename.MP, and the Image is
+    # filename.MP.jpg.
+
+    google_pixel_live_photo = file_base + ".MP.jpg"
+
+    if os.path.exists(google_pixel_live_photo):
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        print("Removing", file_path)
+
+
+def replace_with_edited(file_path):
+
+    edited_pattern = r"-edited."
+
+    match = re.search(edited_pattern, file_path)
+
+    if not match:
+        return
+
+    non_edited_file = re.sub(edited_pattern, ".", file_path)
+
+    print(file_path)
+    print(non_edited_file)
+
+    if os.path.exists(non_edited_file):
+        files_to_replace[file_path] = non_edited_file
+
 
 def perfect_match_json(file_path):
 
@@ -188,13 +230,20 @@ def perfect_match_json(file_path):
     if file_extension == ".json":
         return
 
-    json_file, json_file_no_extension = calculate_json_file_name(file_path)
+    json_file, json_file_no_extension, dupe_not_moved = (
+        calculate_json_file_name(file_path)
+    )
+
+    print(json_file, json_file_no_extension)
 
     if os.path.exists(json_file):
         process(file_path, json_file)
 
     elif os.path.exists(json_file_no_extension):
         process(file_path, json_file_no_extension)
+
+    elif os.path.exists(dupe_not_moved):
+        process(file_path, dupe_not_moved)
 
 
 # Iterate through all non json files in the folder.
@@ -212,6 +261,13 @@ def iterate(folder_path, function):
                 x, "/", num_files, "running", function.__name__, "on", file_path
             )
             function(file_path)
+
+
+# The key is the file name, the value is the new file name.
+files_to_rename = {}
+
+# The key source, the value is the destination.
+files_to_replace = {}
 
 
 # Main function
@@ -238,11 +294,23 @@ def main():
     iterate(INPUT_FOLDER, find_files_to_rename)
 
     print("Renaming files")
+
     # Rename the files.
     for old_file, new_file in files_to_rename.items():
         print("Renaming", old_file, "->", new_file)
         os.rename(old_file, new_file)
 
+    # Merge edited photos
+    print("Finding files to replace")
+    # Find all files that would match a neighboring file if they had one less
+    # character in the base name.
+    iterate(INPUT_FOLDER, replace_with_edited)
+
+    for src, dest in files_to_replace.items():
+
+        print("Replacing", src, "->", dest)
+        os.remove(dest)
+        os.rename(src, dest)
 
     iterate(INPUT_FOLDER, remove_live_photos)
 
@@ -253,4 +321,5 @@ def main():
 if __name__ == "__main__":
 
     main()
-    pass
+
+# Screenshot_20210108-184857 (1).png
