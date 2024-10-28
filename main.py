@@ -2,11 +2,59 @@ import datetime
 import os
 import re
 
-from modules.json_manager import get_timestamp_from_json
 
-INPUT_FOLDER = "Photos\\Input2"
-OUTPUT_FOLDER = "Photos\\Output2"
+from modules.json_manager import get_timestamp_from_json
+INPUT_FOLDER = "Photos\\Input"
+OUTPUT_FOLDER = "Photos\\Output"
 REJECT_FOLDER = "Photos\\Rejects"
+
+
+def fix_jpeg(file_path):
+
+    paten_jpeg = r"\.jpeg"
+    match_jpeg = re.search(paten_jpeg, file_path)
+
+    if match_jpeg:
+
+        new_file_path = re.sub(paten_jpeg, ".jpg", file_path)
+
+        files_to_rename[file_path] = new_file_path
+
+        return
+
+    paten_jpe = r"\.jpe\."
+
+    match_jpe = re.search(paten_jpe, file_path)
+
+    if match_jpe:
+
+        print(file_path)
+
+        new_file_path = re.sub(paten_jpe, ".jpg.", file_path)
+
+        files_to_rename[file_path] = new_file_path
+
+        return
+
+    paten_jp = r"\.jp\."
+    match_jp = re.search(paten_jp, file_path)
+
+    if match_jp:
+
+        new_file_path = re.sub(paten_jp, ".jpg.", file_path)
+
+        files_to_rename[file_path] = new_file_path
+        return
+
+    paten_double_dots = r"\.\."
+    match_double_dots = re.search(paten_double_dots, file_path)
+
+    if match_double_dots:
+
+        new_file_path = re.sub(paten_double_dots, ".", file_path)
+
+        files_to_rename[file_path] = new_file_path
+        return
 
 
 def process(file_path, json_file):
@@ -19,29 +67,28 @@ def process(file_path, json_file):
     offset = 0
 
     # This is a hacky way to handle duplicate timestamps.
-    while offset < 100:
+    while offset < 1000:
 
         if offset != 0:
             print("trying offset", offset)
 
-        new_timestamp = timestamp + offset
-
-        new_base_name = datetime.datetime.fromtimestamp(new_timestamp).strftime(
+        new_base_name = datetime.datetime.fromtimestamp(timestamp).strftime(
             "%Y%m%d_%H%M%S"
         )
+
+        if offset != 0:
+            new_base_name += f"-{offset}"
+
         new_file_name = new_base_name + file_extension
         new_file_path = os.path.join(OUTPUT_FOLDER, new_file_name)
 
         if not os.path.exists(new_file_path):
-            os.utime(file_path, (new_timestamp, new_timestamp))
+            os.utime(file_path, (timestamp, timestamp))
             os.rename(file_path, new_file_path)
             os.remove(json_file)
-
             return
 
         offset += 1
-
-    print("Capped out at", file_path)
 
 
 # Look for a corresponding json file.
@@ -97,16 +144,12 @@ def find_files_to_rename_supplemental_metadata(file_path):
 
             files_to_rename[file_path] = new_file_path
 
-            return
-
         if match_no_dupe:
             new_file_path = re.sub(
                 pattern_no_dupe, replacement_pattern_no_dupe, file_path
             )
 
             files_to_rename[file_path] = new_file_path
-
-            return
 
 
 def compare_files(file_a, file_b):
@@ -211,9 +254,6 @@ def replace_with_edited(file_path):
 
     non_edited_file = re.sub(edited_pattern, ".", file_path)
 
-    print(file_path)
-    print(non_edited_file)
-
     if os.path.exists(non_edited_file):
         files_to_replace[file_path] = non_edited_file
 
@@ -233,8 +273,6 @@ def perfect_match_json(file_path):
     json_file, json_file_no_extension, dupe_not_moved = (
         calculate_json_file_name(file_path)
     )
-
-    print(json_file, json_file_no_extension)
 
     if os.path.exists(json_file):
         process(file_path, json_file)
@@ -288,13 +326,6 @@ def main():
     # character in the base name.
     iterate(INPUT_FOLDER, find_files_to_rename_supplemental_metadata)
 
-    print("Finding any files with an extra character")
-    # Find all files that would match a neighboring file if they had one less
-    # character in the base name.
-    iterate(INPUT_FOLDER, find_files_to_rename)
-
-    print("Renaming files")
-
     # Rename the files.
     for old_file, new_file in files_to_rename.items():
         print("Renaming", old_file, "->", new_file)
@@ -311,6 +342,36 @@ def main():
         print("Replacing", src, "->", dest)
         os.remove(dest)
         os.rename(src, dest)
+
+    files_to_rename.clear()
+
+    print("Finding files to fix JPEG")
+    # Find all files that would match a neighboring file if they had one less
+    # character in the base name.
+    iterate(INPUT_FOLDER, fix_jpeg)
+
+    # Rename the files.
+    for old_file, new_file in files_to_rename.items():
+        print("Renaming", old_file, "->", new_file)
+        os.rename(old_file, new_file)
+
+    iterate(INPUT_FOLDER, remove_live_photos)
+
+    iterate(INPUT_FOLDER, perfect_match_json)
+
+    files_to_rename.clear()
+
+    print("Finding any files with an extra character")
+    # Find all files that would match a neighboring file if they had one less
+    # character in the base name.
+    iterate(INPUT_FOLDER, find_files_to_rename)
+
+    print("Renaming files")
+
+    # Rename the files.
+    for old_file, new_file in files_to_rename.items():
+        print("Renaming", old_file, "->", new_file)
+        os.rename(old_file, new_file)
 
     iterate(INPUT_FOLDER, remove_live_photos)
 
